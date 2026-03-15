@@ -522,6 +522,7 @@ export default function App() {
     clearInterval(timerRef.current);
     stopNag();
     swPost({ type: 'CANCEL_ALARM', id: 'laundry' });
+    await cancelNtfyNotifications(topicId, notifIdRef.current);
     notifIdRef.current = [];
     await setInProgress(false);
     await clearSession();
@@ -569,7 +570,12 @@ export default function App() {
         { extraMs: 25 * 60000, title: '⚠️ 25+ min waiting', body: 'Wet clothes get musty. Move them NOW!' },
       ],
     });
-    setAlarmScheduled(navigator.serviceWorker?.controller ? 'ok' : 'fail');
+    // ntfy scheduled delivery — works even when phone is locked
+    notifIdRef.current = await scheduleNtfyNagSeries(topicId, washDuration * 1000, '🌀 Wash done!', 'Move your clothes to the dryer.', [
+      { extraMs: 10 * 60000, title: '👋 Still in the washer', body: 'Go move them to the dryer!' },
+      { extraMs: 25 * 60000, title: '⚠️ 25+ min waiting', body: 'Wet clothes get musty. Move them NOW!' },
+    ]);
+    setAlarmScheduled('ok');
     startCountdown(washDuration, () => {
       if (phaseRef.current === PHASES.WASHING) {
         setPhase(PHASES.NAG_DRYER);
@@ -595,7 +601,12 @@ export default function App() {
         { extraMs: 25 * 60000, title: '⚠️ 25+ min waiting', body: 'Wrinkles are setting in. Fold them NOW!' },
       ],
     });
-    setAlarmScheduled(navigator.serviceWorker?.controller ? 'ok' : 'fail');
+    // ntfy scheduled delivery — works even when phone is locked
+    notifIdRef.current = await scheduleNtfyNagSeries(topicId, dryDuration * 1000, '🌪️ Dryer done!', 'Time to fold and put away.', [
+      { extraMs: 10 * 60000, title: '👋 Still in the dryer', body: 'Go fold your clothes!' },
+      { extraMs: 25 * 60000, title: '⚠️ 25+ min waiting', body: 'Wrinkles are setting in. Fold them NOW!' },
+    ]);
+    setAlarmScheduled('ok');
     startCountdown(dryDuration, () => {
       if (phaseRef.current === PHASES.DRYING) {
         const nagNow = Date.now();
@@ -640,6 +651,7 @@ export default function App() {
     stopNag();
     clearInterval(timerRef.current);
     swPost({ type: 'CANCEL_ALARM', id: 'laundry' });
+    await cancelNtfyNotifications(topicId, notifIdRef.current);
     notifIdRef.current = [];
 
     const now = new Date();
@@ -751,6 +763,43 @@ export default function App() {
             </div>
           )}
 
+
+          {/* ntfy setup — subscribe to get notifications even when phone is locked */}
+          {topicId && (
+            <div style={{ background: '#1a2235', border: `1px solid ${ntfyReady ? '#22c55e44' : '#f59e0b44'}`, borderRadius: 14, padding: '14px 16px', marginBottom: 16, textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: ntfyReady ? '#4ade80' : 'rgba(255,255,255,0.9)', marginBottom: 6 }}>
+                {ntfyReady ? '✅ ntfy connected — phone alerts active' : '📲 Connect ntfy for locked-screen alerts'}
+              </div>
+              {!ntfyReady && (
+                <>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 10 }}>
+                    Install the free <strong style={{ color: 'rgba(255,255,255,0.7)' }}>ntfy</strong> app → tap <strong style={{ color: 'rgba(255,255,255,0.7)' }}>+</strong> → paste this topic name:
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', fontFamily: "'Space Mono', monospace", wordBreak: 'break-all', flex: 1 }}>{topicId}</div>
+                    <button onClick={() => navigator.clipboard?.writeText(topicId).catch(() => {})}
+                      style={{ flexShrink: 0, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '4px 10px', fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>
+                      Copy
+                    </button>
+                  </div>
+                </>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!ntfyReady && (
+                  <button onClick={async () => { await storage.set('ntfy-ready', 'true'); setNtfyReady(true); }}
+                    style={{ flex: 1, background: `${colors.accent}33`, border: `1px solid ${colors.accent}66`, color: colors.accent, borderRadius: 8, padding: '9px', fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                    I subscribed ✓
+                  </button>
+                )}
+                {ntfyReady && (
+                  <button onClick={async () => { await storage.set('ntfy-ready', 'false'); setNtfyReady(false); }}
+                    style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)', borderRadius: 8, padding: '9px', fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                    Re-subscribe / change topic
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Main CTA */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
