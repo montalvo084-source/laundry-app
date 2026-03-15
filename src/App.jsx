@@ -98,46 +98,28 @@ async function getOrCreateTopicId() {
   } catch (_) { return null; }
 }
 
-// Returns ntfy message ID string (used to cancel), or null on failure
-async function scheduleNtfyNotification(topicId, delayMs, title, body) {
-  if (!topicId) return null;
-  try {
-    const headers = { 'Title': title, 'Priority': 'high', 'Tags': 'bell' };
-    if (delayMs > 0) {
-      const delayMins = Math.max(1, Math.round(delayMs / 60000));
-      headers['Delay'] = `${delayMins}min`;
-    }
-    const res = await fetch(`https://ntfy.sh/${topicId}`, {
-      method: 'POST',
-      headers,
-      body: body,
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.id ?? null;
-    }
-  } catch (_) {}
-  return null;
-}
-
-// Schedule the initial alert + escalating follow-ups. Returns array of IDs.
+// Schedule notifications via the Railway backend (server-side, reliable)
 async function scheduleNtfyNagSeries(topicId, baseDelayMs, firstTitle, firstBody, followUps) {
-  if (!topicId) return [];
-  const ids = await Promise.all([
-    scheduleNtfyNotification(topicId, baseDelayMs, firstTitle, firstBody),
-    ...followUps.map(({ extraMs, title, body }) =>
-      scheduleNtfyNotification(topicId, baseDelayMs + extraMs, title, body)
-    ),
-  ]);
-  return ids.filter(Boolean);
+  if (!topicId) return false;
+  try {
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 'laundry',
+        fireAt: Date.now() + baseDelayMs,
+        title: firstTitle,
+        body: firstBody,
+        topicId,
+        followUps,
+      }),
+    });
+    return res.ok;
+  } catch (_) { return false; }
 }
 
-// Cancel an array of ntfy message IDs
-async function cancelNtfyNotifications(topicId, ids) {
-  if (!topicId || !ids?.length) return;
-  await Promise.allSettled(
-    ids.map(id => fetch(`https://ntfy.sh/${topicId}/${id}`, { method: 'DELETE' }).catch(() => {}))
-  );
+async function cancelNtfyNotifications() {
+  try { await fetch('/api/schedule/laundry', { method: 'DELETE' }); } catch (_) {}
 }
 
 // ─── Storage shim ─────────────────────────────────────────────────────────────
@@ -522,7 +504,7 @@ export default function App() {
     clearInterval(timerRef.current);
     stopNag();
     swPost({ type: 'CANCEL_ALARM', id: 'laundry' });
-    await cancelNtfyNotifications(topicId, notifIdRef.current);
+    await cancelNtfyNotifications();
     notifIdRef.current = [];
     await setInProgress(false);
     await clearSession();
@@ -571,7 +553,7 @@ export default function App() {
       ],
     });
     // ntfy scheduled delivery — works even when phone is locked
-    notifIdRef.current = await scheduleNtfyNagSeries(topicId, washDuration * 1000, '🌀 Wash done!', 'Move your clothes to the dryer.', [
+    await scheduleNtfyNagSeries(topicId, washDuration * 1000, '🌀 Wash done!', 'Move your clothes to the dryer.', [
       { extraMs: 10 * 60000, title: '👋 Still in the washer', body: 'Go move them to the dryer!' },
       { extraMs: 25 * 60000, title: '⚠️ 25+ min waiting', body: 'Wet clothes get musty. Move them NOW!' },
     ]);
@@ -602,7 +584,7 @@ export default function App() {
       ],
     });
     // ntfy scheduled delivery — works even when phone is locked
-    notifIdRef.current = await scheduleNtfyNagSeries(topicId, dryDuration * 1000, '🌪️ Dryer done!', 'Time to fold and put away.', [
+    await scheduleNtfyNagSeries(topicId, dryDuration * 1000, '🌪️ Dryer done!', 'Time to fold and put away.', [
       { extraMs: 10 * 60000, title: '👋 Still in the dryer', body: 'Go fold your clothes!' },
       { extraMs: 25 * 60000, title: '⚠️ 25+ min waiting', body: 'Wrinkles are setting in. Fold them NOW!' },
     ]);
@@ -651,7 +633,7 @@ export default function App() {
     stopNag();
     clearInterval(timerRef.current);
     swPost({ type: 'CANCEL_ALARM', id: 'laundry' });
-    await cancelNtfyNotifications(topicId, notifIdRef.current);
+    await cancelNtfyNotifications();
     notifIdRef.current = [];
 
     const now = new Date();
