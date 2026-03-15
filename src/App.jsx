@@ -341,7 +341,7 @@ export default function App() {
   const [ntfyReady, setNtfyReady]       = useState(false);
   const [ntfyTestState, setNtfyTestState] = useState('idle'); // 'idle' | 'sending' | 'ok' | 'fail'
   const [notifPermission, setNotifPermission] = useState(
-    typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
   const [alarmScheduled, setAlarmScheduled] = useState(null); // null | 'ok' | 'fail'
 
@@ -735,27 +735,19 @@ export default function App() {
 
           {/* Notification permission prompt */}
           {notifPermission !== 'granted' && (
-            <div style={{ background: notifPermission === 'denied' ? '#3d1000' : '#1a2235', border: `1px solid ${notifPermission === 'denied' ? '#ef444444' : '#f59e0b44'}`, borderRadius: 14, padding: '14px 16px', marginBottom: 16, textAlign: 'left' }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'rgba(255,255,255,0.9)', marginBottom: 6 }}>
-                {notifPermission === 'denied' ? '🚫 Notifications blocked' : '🔔 Allow notifications'}
+            <div style={{ background: '#1a2235', border: `1px solid ${colors.accent}44`, borderRadius: 14, padding: '16px', marginBottom: 16, textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>
+                🔔 Enable notifications
               </div>
-              {notifPermission === 'denied' ? (
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                  You blocked notifications. Go to your browser settings and allow notifications for this site, then reload.
-                </p>
-              ) : (
-                <>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginBottom: 10 }}>
-                    Required to alert you when your laundry is done. Also, <strong style={{ color: 'rgba(255,255,255,0.7)' }}>add this app to your Home Screen</strong> (Safari → Share → Add to Home Screen) for reliable background alerts.
-                  </p>
-                  <button
-                    onClick={requestNotifPermission}
-                    style={{ width: '100%', background: `${colors.accent}33`, border: `1px solid ${colors.accent}66`, color: colors.accent, borderRadius: 10, padding: '10px', fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
-                  >
-                    Allow notifications →
-                  </button>
-                </>
-              )}
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginBottom: 12 }}>
+                Tap below so this app can alert you when your laundry is done — even when you're using another app.
+              </p>
+              <button
+                onClick={requestNotifPermission}
+                style={{ width: '100%', background: `${colors.accent}33`, border: `1px solid ${colors.accent}66`, color: colors.accent, borderRadius: 10, padding: '12px', fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
+              >
+                Enable notifications →
+              </button>
             </div>
           )}
 
